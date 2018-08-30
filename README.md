@@ -2,16 +2,13 @@
 Keras implementation of [Balancing GAN (BAGAN)](https://arxiv.org/abs/1803.09655) applied to the MNIST example.
 
 The framework is meant as a tool for data augmentation for imbalanced image-classification datasets where some classes are under represented.
-The generative model applied to sample new images for the minority class is trained in three steps: a) autoencoder training, b) initialization of the generative adversarial framework, and c) fine tuning of the generative model in adversarial mode.
+The generative model applied to sample new images for the minority class is trained in three steps: a) training a preliminary autoencoder, b) initialization of the generative adversarial framework by means of the pre-trained autoencoder modules, and c) fine tuning of the generative model in adversarial mode.
 
 
-(Figures/Autoencoder.png)
-(Figures/BAGAN-init.png)
-(Figures/BAGAN-train.png)
 
-Along these steps, the generative model learns from all available data enabling it to figure out useful features from majority classes that can be used to draw minority classes.
-For example, when considering a traffic sign identification problem, all warning signs share the same external triangular shape.
-BAGAN can easily learn the triangular shape from any warning sign in the majority classes and reuse this pattern to draw other underrepresented warning signs.
+Along these steps, the generative model learns from all available data including minority and majority classes. This enables the model to automatically figuring out if and which features from over-represented classes can be used to draw new images for under-represented classes.
+For example, when considering a traffic sign recognition problem, all warning signs share the same external triangular shape.
+BAGAN can easily learn the triangular shape from any warning sign in the majority classes and reuse this pattern to draw other under-represented warning signs.
 
 The application of this approach toward fairness enhancement and bias mitigation in deep-learning AI systems is currently an active research topic.
 
@@ -19,16 +16,17 @@ The application of this approach toward fairness enhancement and bias mitigation
 
 The [German Traffic Sign Recognition benchmark](http://benchmark.ini.rub.de/) is an example of imbalanced dataset composed of 43 classes, where the minority class appears 210 times, whereas the majority class 2250 times.
 
-Here we show image samples generated with BAGAN for the three minority classes.
-(Figures/bagan_x5_minority.png)
+Here we show representative sample images generated with BAGAN for the three least represented classes.
+
+![alt text](Figures/bagan_x5_minority.png)
 
 Refer to the original work (https://arxiv.org/abs/1803.09655) for a comparison to other state of the art approaches.
 
 
-The code in this repository executes on the MNIST dataset. The dataset is originally balanced and, before to train BAGAN, we force class imbalance by selecting a target class and removing from the training dataset a significant portion of its instances.
-In the following figure we present samples generated when considering the 0-images as minority class and we drop 97.5\% of its instances from the training set before training.
+The code in this repository executes on the [MNIST dataset](http://yann.lecun.com/exdb/mnist/). The dataset is originally balanced and, before to train BAGAN, we force class imbalance by selecting a target class and removing from the training dataset a significant portion of its instances.
+The following figure shows 0-image samples generated when dropping 97.5\% of 0-images from the training set before training.
 
-(Figures/plot_class_0.png)
+![alt text](Figures/plot_class_0.png)
 
 
 
