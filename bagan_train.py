@@ -26,50 +26,45 @@ if __name__ == '__main__':
     # Collect arguments
     argParser = OptionParser()
                   
-    argParser.add_option("-u", "--unbalance", default = 0.2,
+    argParser.add_option("-u", "--unbalance", default=0.2,
                   action="store", type="float", dest="unbalance",
-                  help="Unbalance factor u. The minority class has samples u * otherClassSamples.")
+                  help="Unbalance factor u. The minority class has at most u * otherClassSamples instances.")
 
-    argParser.add_option("-s", "--random_seed", default = 0,
+    argParser.add_option("-s", "--random_seed", default=0,
                   action="store", type="int", dest="seed",
                   help="Random seed for repeatable subsampling.")
 
-    argParser.add_option("-d", "--sampling_mode_for_discriminator", default = "uniform",
+    argParser.add_option("-d", "--sampling_mode_for_discriminator", default="uniform",
                   action="store", type="string", dest="dratio_mode",
                   help="Dratio sampling mode (\"uniform\",\"rebalance\").")
     
-    argParser.add_option("-g", "--sampling_mode_for_generator", default = "uniform",
+    argParser.add_option("-g", "--sampling_mode_for_generator", default="uniform",
                   action="store", type="string", dest="gratio_mode",
                   help="Gratio sampling mode (\"uniform\",\"rebalance\").")
 
-    argParser.add_option("-e", "--epochs", default = 3,
+    argParser.add_option("-e", "--epochs", default=3,
                   action="store", type="int", dest="epochs",
                   help="Training epochs.")
 
-    argParser.add_option("-l", "--learning_rate", default = 0.00005,
+    argParser.add_option("-l", "--learning_rate", default=0.00005,
                   action="store", type="float", dest="adam_lr",
                   help="Training learning rate.")
 
-    argParser.add_option("-c", "--target_class", default = -1,
+    argParser.add_option("-c", "--target_class", default=-1,
                   action="store", type="int", dest="target_class",
                   help="If greater or equal to 0, model trained only for the specified class.")
-        
 
     (options, args) = argParser.parse_args()
-    if (options.unbalance > 1.0 or options.unbalance <= 0.0):
-        print("Data unbalance factor must be > 0 and <= 1")
-        exit(1)
-    else:
-        print("Class and GANS advanced...")
 
+    assert (options.unbalance <= 1.0 and options.unbalance > 0.0), "Data unbalance factor must be > 0 and <= 1"
 
+    print("Executing BAGAN.")
 
     # Read command line parameters
     np.random.seed(options.seed)
     unbalance = options.unbalance
     gratio_mode = options.gratio_mode
     dratio_mode = options.dratio_mode
-    c_epochs = options.epochs
     gan_epochs = options.epochs
     adam_lr = options.adam_lr
     opt_class = options.target_class
@@ -85,7 +80,6 @@ if __name__ == '__main__':
     )
     if not os.path.exists(res_dir):
         os.makedirs(res_dir)
-
 
     # Read initial data.
     print("read input data...")
@@ -105,54 +99,55 @@ if __name__ == '__main__':
 
     classes = bg_train_full.get_label_table()
 
-    # Train classifier.
-
     # Initialize statistics information
-    uc_train_history = defaultdict(list)
-    uc_test_history = defaultdict(list)
-
     gan_train_losses = defaultdict(list)
     gan_test_losses = defaultdict(list)
 
     img_samples = defaultdict(list)
 
-
     # For all possible minority classes.
     target_classes = np.array(range(len(classes)))
     if opt_class >= 0:
-        min_classes =  np.array(range(opt_class, opt_class + 1))
+        min_classes = np.array([opt_class])
     else:
         min_classes = target_classes
 
     for c in min_classes:
-        # If instance pruning is not applied, then the same BAGAN can be applied to every class.
+        # If unbalance is 1.0, then the same BAGAN model can be applied to every class because
+        # we do not drop any instance at training time.
         if unbalance == 1.0 and c > 0 and (
-            os.path.exists("{}/class_{}_score.csv".format(res_dir, c)) and
-            os.path.exists("{}/class_{}_discriminator.h5".format(res_dir, c)) and
-            os.path.exists("{}/class_{}_generator.h5".format(res_dir, c)) and
-            os.path.exists("{}/class_{}_reconstructor.h5".format(res_dir, c))
-        ):  # Without additional imbalance, the BAGAN does not need to be retrained
+            os.path.exists("{}/class_0_score.csv".format(res_dir, c)) and
+            os.path.exists("{}/class_0_discriminator.h5".format(res_dir, c)) and
+            os.path.exists("{}/class_0_generator.h5".format(res_dir, c)) and
+            os.path.exists("{}/class_0_reconstructor.h5".format(res_dir, c))
+        ):
+            # Without additional imbalance, BAGAN does not need to be retrained, we simlink the pregenerated model
             os.symlink("{}/class_0_score.csv".format(res_dir), "{}/class_{}_score.csv".format(res_dir, c))
             os.symlink("{}/class_0_discriminator.h5".format(res_dir), "{}/class_{}_discriminator.h5".format(res_dir, c))
             os.symlink("{}/class_0_generator.h5".format(res_dir), "{}/class_{}_generator.h5".format(res_dir, c))
             os.symlink("{}/class_0_reconstructor.h5".format(res_dir), "{}/class_{}_reconstructor.h5".format(res_dir, c))
 
+        # Unbalance the training set.
+        bg_train_partial = BatchGenerator(BatchGenerator.TRAIN, batch_size,
+                                          class_to_prune=c, unbalance=unbalance)
+
+        # Train the model (or reload it if already available
         if not (
-                    os.path.exists("{}/class_{}_score.csv".format(res_dir, c)) and
-                    os.path.exists("{}/class_{}_discriminator.h5".format(res_dir, c)) and
-                    os.path.exists("{}/class_{}_generator.h5".format(res_dir, c)) and
-                    os.path.exists("{}/class_{}_reconstructor.h5".format(res_dir, c))
-        ):  # Skip GAN training if results are available
+                os.path.exists("{}/class_{}_score.csv".format(res_dir, c)) and
+                os.path.exists("{}/class_{}_discriminator.h5".format(res_dir, c)) and
+                os.path.exists("{}/class_{}_generator.h5".format(res_dir, c)) and
+                os.path.exists("{}/class_{}_reconstructor.h5".format(res_dir, c))
+        ):
+            # Training required
             print("Required GAN for class {}".format(c))
 
-            # Unbalance the training.
-            bg_train_partial = BatchGenerator(BatchGenerator.TRAIN, batch_size,
-                                              class_to_prune=c, unbalance=unbalance)
             print('Class counters: ', bg_train_partial.per_class_count)
 
             # Train GAN to balance the data
-            gan = bagan.BalancingGAN(target_classes, c, dratio_mode=dratio_mode, gratio_mode=gratio_mode,
-                                     adam_lr=adam_lr, res_dir=res_dir, image_shape=shape, min_latent_res=min_latent_res)
+            gan = bagan.BalancingGAN(
+                target_classes, c, dratio_mode=dratio_mode, gratio_mode=gratio_mode,
+                adam_lr=adam_lr, res_dir=res_dir, image_shape=shape, min_latent_res=min_latent_res
+            )
             gan.train(bg_train_partial, bg_test, epochs=gan_epochs)
             gan.save_history(
                 res_dir, c
@@ -161,8 +156,6 @@ if __name__ == '__main__':
         else:  # GAN pre-trained
             # Unbalance the training.
             print("Loading GAN for class {}".format(c))
-            bg_train_partial = BatchGenerator(BatchGenerator.TRAIN, batch_size,
-                                              class_to_prune=c, unbalance=unbalance)
 
             gan = bagan.BalancingGAN(target_classes, c, dratio_mode=dratio_mode, gratio_mode=gratio_mode,
                                      adam_lr=adam_lr, res_dir=res_dir, image_shape=shape, min_latent_res=min_latent_res)

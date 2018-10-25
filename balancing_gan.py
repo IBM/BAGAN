@@ -35,6 +35,7 @@ from PIL import Image
 
 from utils import save_image_array
 
+
 class BalancingGAN:
     def build_generator(self, latent_size, init_resolution=8):
         resolution = self.resolution
@@ -53,8 +54,10 @@ class BalancingGAN:
         while crt_res != resolution:
             cnn.add(UpSampling2D(size=(2, 2)))
             if crt_res < resolution/2:
-                cnn.add(Conv2D(256, (5, 5), padding='same',
-                                      activation='relu', kernel_initializer='glorot_normal', use_bias=False))
+                cnn.add(Conv2D(
+                    256, (5, 5), padding='same',
+                    activation='relu', kernel_initializer='glorot_normal', use_bias=False)
+                )
 
             else:
                 cnn.add(Conv2D(128, (5, 5), padding='same',
@@ -75,9 +78,7 @@ class BalancingGAN:
         # The input-output interface
         self.generator = Model(inputs=latent, outputs=fake_image_from_latent)
 
-
-    # latent_size is the innermost latent vector size; min_latent_res is latent resolution (before the dense layer).
-    def build_reconstructor(self, latent_size, min_latent_res=8):
+    def _build_common_encoder(self, image, min_latent_res=8):
         resolution = self.resolution
         channels = self.channels
 
@@ -112,9 +113,15 @@ class BalancingGAN:
 
         cnn.add(Flatten())
 
-        image = Input(shape=(channels, resolution, resolution))
-
         features = cnn(image)
+        return features
+
+    # latent_size is the innermost latent vector size; min_latent_res is latent resolution (before the dense layer).
+    def build_reconstructor(self, latent_size, min_latent_res=8):
+        resolution = self.resolution
+        channels = self.channels
+        image = Input(shape=(channels, resolution, resolution))
+        features = self._build_common_encoder(image, min_latent_res)
 
         # Reconstructor specific
         latent = Dense(latent_size, activation='linear')(features)
@@ -123,41 +130,8 @@ class BalancingGAN:
     def build_discriminator(self, min_latent_res=8):
         resolution = self.resolution
         channels = self.channels
-
-        # build a relatively standard conv net, with LeakyReLUs as suggested in ACGAN
-        cnn = Sequential()
-
-        cnn.add(Conv2D(32, (3, 3), padding='same', strides=(2, 2),
-                              input_shape=(channels, resolution, resolution)))
-        cnn.add(LeakyReLU())
-        cnn.add(Dropout(0.3))
-
-        cnn.add(Conv2D(64, (3, 3), padding='same', strides=(1, 1)))
-        cnn.add(LeakyReLU())
-        cnn.add(Dropout(0.3))
-
-        cnn.add(Conv2D(128, (3, 3), padding='same', strides=(2, 2)))
-        cnn.add(LeakyReLU())
-        cnn.add(Dropout(0.3))
-
-        cnn.add(Conv2D(256, (3, 3), padding='same', strides=(1, 1)))
-        cnn.add(LeakyReLU())
-        cnn.add(Dropout(0.3))
-
-        while cnn.output_shape[-1] > min_latent_res:
-            cnn.add(Conv2D(256, (3, 3), padding='same', strides=(2, 2)))
-            cnn.add(LeakyReLU())
-            cnn.add(Dropout(0.3))
-
-            cnn.add(Conv2D(256, (3, 3), padding='same', strides=(1, 1)))
-            cnn.add(LeakyReLU())
-            cnn.add(Dropout(0.3))
-        
-        cnn.add(Flatten())
-
         image = Input(shape=(channels, resolution, resolution))
-        
-        features = cnn(image)
+        features = self._build_common_encoder(image, min_latent_res)
 
         # Discriminator specific
         aux = Dense(
@@ -217,8 +191,10 @@ class BalancingGAN:
 
         # Build generator
         self.build_generator(latent_size, init_resolution=min_latent_res)
-        self.generator.compile(optimizer=Adam(lr=self.adam_lr, beta_1=self.adam_beta_1),
-                          loss='sparse_categorical_crossentropy')
+        self.generator.compile(
+            optimizer=Adam(lr=self.adam_lr, beta_1=self.adam_beta_1),
+            loss='sparse_categorical_crossentropy'
+        )
 
         latent_gen = Input(shape=(latent_size, ))
 
@@ -298,11 +274,9 @@ class BalancingGAN:
 
             generated_images = self.generator.predict(latent_gen, verbose=0)
 
-            # Concatenate the batch
             X = np.concatenate((image_batch, generated_images))
             aux_y = np.concatenate((label_batch, np.full(len(sampled_labels) , self.nclasses )), axis=0)
-    
-            # Let the discriminator figure itself out...
+
             epoch_disc_loss.append(self.discriminator.train_on_batch(X, aux_y))
 
             ################## Train Generator ##################
@@ -313,7 +287,6 @@ class BalancingGAN:
                 latent_gen, sampled_labels))
 
         # return statistics: generator loss,
-        print()
         return (
             np.mean(np.array(epoch_disc_loss), axis=0),
             np.mean(np.array(epoch_gen_loss), axis=0)
@@ -324,7 +297,6 @@ class BalancingGAN:
         # Set uniform
         target = 1/self.nclasses
         self.class_uratio = np.full(self.nclasses, target)
-        
         
         # Set gratio
         self.class_gratio = np.full(self.nclasses, 0.0)
@@ -348,13 +320,13 @@ class BalancingGAN:
                 print("Error while training bgan, unknown dmode " + self.dratio_mode)
                 exit()
 
-        # if completely unbalanced, the gratio might be negative for some classes.
+        # if very unbalanced, the gratio might be negative for some classes.
         # In this case, we adjust..
         if self.gratio_mode == "rebalance":
             self.class_gratio[self.class_gratio < 0] = 0
             self.class_gratio = self.class_gratio / sum(self.class_gratio)
             
-        # if completely unbalanced, the dratio might be negative for some classes.
+        # if very unbalanced, the dratio might be negative for some classes.
         # In this case, we adjust..
         if self.dratio_mode == "rebalance":
             self.class_dratio[self.class_dratio < 0] = 0
@@ -392,7 +364,7 @@ class BalancingGAN:
         else:
             print("BAGAN: training autoencoder")
             autoenc_train_loss = []
-            for e in range(self.autoenc_0_epochs):
+            for e in range(self.autoenc_epochs):
                 autoenc_train_loss_crt = []
                 for image_batch, label_batch in bg_train.next_batch():
 
@@ -438,8 +410,6 @@ class BalancingGAN:
             np.save(mfname, self.means)
             print("BAGAN: saved multivariate")
 
-        # ext_latent = np.random.multivariate_normal(mean_0, cov_0, 20)
-
     def _get_lst_bck_name(self, element):
         # Find last bck name
         files = [
@@ -462,9 +432,8 @@ class BalancingGAN:
         epoch, generator_fname = self._get_lst_bck_name("generator")
 
         new_e, discriminator_fname = self._get_lst_bck_name("discriminator")
-        print("Debug init bagan: epoch, gen_name, new_e, disc_name", epoch, generator_fname, new_e, discriminator_fname)
 
-        if new_e != epoch:
+        if new_e != epoch:  # Reload error, restart from scratch
             return 0
 
         # Load last bck
@@ -474,9 +443,7 @@ class BalancingGAN:
             return epoch
 
         # Return epoch
-        except:
-            print("Debug init bagan reload failed: gen_name, disc_name", generator_fname, discriminator_fname)
-            print("Error: ", sys.exc_info()[0])
+        except:  # Reload error, restart from scratch (the first time we train we pass from here)
             return 0
 
     def backup_point(self, epoch):
@@ -487,7 +454,7 @@ class BalancingGAN:
             os.remove(os.path.join(self.res_dir, old_bck_g))
             os.remove(os.path.join(self.res_dir, old_bck_d))
         except:
-            None
+            pass
 
         # Bck
         generator_fname = "{}/bck_c_{}_generator_e_{}.h5".format(self.res_dir, self.target_class_id, epoch)
@@ -498,8 +465,7 @@ class BalancingGAN:
 
     def train(self, bg_train, bg_test, epochs=50):
         if not self.trained:
-            self.autoenc_0_epochs = epochs
-            self.discriminator_0_epochs = 1
+            self.autoenc_epochs = epochs
 
             # Class actual ratio
             self.class_aratio = bg_train.get_class_probability()
@@ -555,14 +521,14 @@ class BalancingGAN:
 
             # Train
             for e in range(start_e, epochs):
-                print('Training [dMode, gMode] [{}, {}]. Epoch {} of {}'
+                print('Epoch {} of {}'
                       .format(self.dratio_mode, self.gratio_mode, e + 1, epochs))
                 # train_disc_loss, train_gen_loss = self._train_one_epoch(copy.deepcopy(bg_train))
                 train_disc_loss, train_gen_loss = self._train_one_epoch(bg_train)
 
                 # Test: # generate a new batch of noise
                 nb_test = bg_test.get_num_samples()
-                fake_size = int(np.ceil(nb_test * 1.0/self.nclasses ))
+                fake_size = int(np.ceil(nb_test * 1.0/self.nclasses))
                 sampled_labels = self._biased_sample_labels(nb_test, "d")
                 latent_gen = self.generate_latent(sampled_labels, bg_test)
             
@@ -645,7 +611,6 @@ class BalancingGAN:
                         '{}/cmp_class_{}_epoch_{}.png'.format(self.res_dir, self.target_class_id, e)
                     )
 
-
             self.trained = True
 
     def generate_samples(self, c, samples, bg = None):
@@ -658,8 +623,10 @@ class BalancingGAN:
             discriminator_fname = "{}/class_{}_discriminator.h5".format(res_dir, class_id)
             reconstructor_fname = "{}/class_{}_reconstructor.h5".format(res_dir, class_id)
             with open(filename, 'w') as csvfile:
-                fieldnames = ['train_gen_loss', 'train_disc_loss',
-                                'test_gen_loss', 'test_disc_loss']
+                fieldnames = [
+                    'train_gen_loss', 'train_disc_loss',
+                    'test_gen_loss', 'test_disc_loss'
+                ]
 
                 writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
 
@@ -679,14 +646,7 @@ class BalancingGAN:
             self.reconstructor.save(reconstructor_fname)
 
     def load_models(self, fname_generator, fname_discriminator, fname_reconstructor, bg_train=None):
-        if bg_train is None:
-            self.generator.load_weights(fname_generator)
-            self.discriminator.load_weights(fname_discriminator)
-            self.reconstructor.load_weights(fname_reconstructor)
-        else:
-            # init_autoencoder will load the generator and reconstructor and will use the reconstructor for assessing
-            # per class mean and variance
-            self.init_autoenc(bg_train, gen_fname=fname_generator, rec_fname=fname_reconstructor)
-            self.discriminator.load_weights(fname_discriminator)
+        self.init_autoenc(bg_train, gen_fname=fname_generator, rec_fname=fname_reconstructor)
+        self.discriminator.load_weights(fname_discriminator)
 
 

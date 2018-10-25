@@ -11,8 +11,7 @@ import numpy as np
 from PIL import Image
 
 
-def save_image_array(img_array, fname):# img array has format: [img_row, img_col, channels, res, res]
-    print(img_array.shape)
+def save_image_array(img_array, fname):
     channels = img_array.shape[2]
     resolution = img_array.shape[-1]
     img_rows = img_array.shape[0]
