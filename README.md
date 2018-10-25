@@ -41,8 +41,8 @@ A directory named: `res_MNIST_dmode_uniform_gmode_uniform_unbalance_0.05_epochs_
 
 After the training, you will find in that directory a set of `h5` files stroging the model weights, a set of `csv` files storing the loss functions measured for each epoch, a set of `npy` files storing means and covariances distributions for the class-conditional latent-vector generator, a set of `cmp_class_<X>_epoch_<Y>.png` showing example images obtained during training.
 
-The file `cmp_class_<X>_epoch_<Y>.png` shows images obtained when training the GAN for Y epochs and considering class X as minority class. There are three row per class: 1) real samples, 2) autoencoded samples, 3) randomly-generated samples.
-Note that in BAGAN, after the initial autoencored training, the generative model is trained in adversarial mode and the autoencoder loss is no longer taken into account. Thus, during the adversarial training the autoencoded images may start deteriorate (row 2 may no longer match row 1), whereas the generated images (row 3) will improve quality.
+The file `cmp_class_<X>_epoch_<Y>.png` shows images obtained when training the GAN for Y epochs and considering class X as minority class. There are three row per class: 1) real samples, 2) autoencoded reconstructed samples, 3) randomly-generated samples.
+Note that in BAGAN, after the initial autoencored training, the generative model is trained in adversarial mode and the autoencoder loss is no longer taken into account. Thus, during the adversarial training the autoencoded images may start to deteriorate (row 2 may no longer match row 1), whereas the generated images (row 3) will improve quality.
 
 For more information about available execution options:
 `python ./bagan_train.py --help`
