@@ -365,6 +365,7 @@ class BalancingGAN:
             print("BAGAN: training autoencoder")
             autoenc_train_loss = []
             for e in range(self.autoenc_epochs):
+                print('Autoencoder train epoch: {}/{}'.format(e+1, self.autoenc_epochs))
                 autoenc_train_loss_crt = []
                 for image_batch, label_batch in bg_train.next_batch():
 
@@ -521,8 +522,7 @@ class BalancingGAN:
 
             # Train
             for e in range(start_e, epochs):
-                print('Epoch {} of {}'
-                      .format(self.dratio_mode, self.gratio_mode, e + 1, epochs))
+                print('GAN train epoch: {}/{}'.format(e+1, epochs))
                 # train_disc_loss, train_gen_loss = self._train_one_epoch(copy.deepcopy(bg_train))
                 train_disc_loss, train_gen_loss = self._train_one_epoch(bg_train)
 
