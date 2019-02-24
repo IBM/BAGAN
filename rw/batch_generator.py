@@ -8,34 +8,56 @@ http://www.eclipse.org/legal/epl-v10.html
 """
 
 from tensorflow.examples.tutorials.mnist import input_data
+import tensorflow as tf
 import numpy as np
 
-class MnistBatchGenerator:
+class BatchGenerator:
 
     TRAIN = 1
     TEST = 0
 
-    def __init__(self, data_src, batch_size=32, class_to_prune=None, unbalance=0):
+    def __init__(self, data_src, batch_size=32, class_to_prune=None, unbalance=0, dataset='MNIST'):
+        assert dataset in ('MNIST', 'CIFAR10'), 'Unknown dataset: ' + dataset
         self.batch_size = batch_size
         self.data_src = data_src
 
         # Load data
-        mnist = input_data.read_data_sets("dataset/mnist", one_hot=False)
+        if dataset == 'MNIST':
+            mnist = input_data.read_data_sets("dataset/mnist", one_hot=False)
 
-        assert self.batch_size > 0, 'Batch size has to be a positive integer!'
+            assert self.batch_size > 0, 'Batch size has to be a positive integer!'
 
-        if self.data_src == self.TEST:
-            self.dataset_x = mnist.test.images
-            self.dataset_y = mnist.test.labels
-        else:
-            self.dataset_x = mnist.train.images
-            self.dataset_y = mnist.train.labels
+            if self.data_src == self.TEST:
+                self.dataset_x = mnist.test.images
+                self.dataset_y = mnist.test.labels
+            else:
+                self.dataset_x = mnist.train.images
+                self.dataset_y = mnist.train.labels
 
-        # Normalize between -1 and 1
-        self.dataset_x = (np.reshape(self.dataset_x, (self.dataset_x.shape[0], 28, 28)) - 0.5) * 2
+            # Normalize between -1 and 1
+            self.dataset_x = (np.reshape(self.dataset_x, (self.dataset_x.shape[0], 28, 28)) - 0.5) * 2
 
-        # Include 1 single color channel
-        self.dataset_x = np.expand_dims(self.dataset_x, axis=1)
+            # Include 1 single color channel
+            self.dataset_x = np.expand_dims(self.dataset_x, axis=1)
+
+        elif dataset == 'CIFAR10':
+            ((x, y), (x_test, y_test)) = tf.keras.datasets.cifar10.load_data()
+
+            if self.data_src == self.TEST:
+                self.dataset_x = x
+                self.dataset_y = y
+            else:
+                self.dataset_x = x_test
+                self.dataset_y = y_test
+
+            # Arrange x: channel first
+            self.dataset_x = np.transpose(self.dataset_x, axes=(0, 3, 1, 2))
+
+            # Normalize between -1 and 1
+            self.dataset_x = self.dataset_x/255 - 0.5
+
+            # Y 1D format
+            self.dataset_y = self.dataset_y[:, 0]
 
         assert (self.dataset_x.shape[0] == self.dataset_y.shape[0])
 

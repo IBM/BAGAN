@@ -8,14 +8,13 @@ http://www.eclipse.org/legal/epl-v10.html
 """
 
 from collections import defaultdict
-from PIL import Image
 
 import numpy as np
 
 from optparse import OptionParser
 
 import balancing_gan as bagan
-from rw.batch_generator_mnist import MnistBatchGenerator as BatchGenerator
+from rw.batch_generator import BatchGenerator as BatchGenerator
 from utils import save_image_array
 
 import os
@@ -54,6 +53,10 @@ if __name__ == '__main__':
                   action="store", type="int", dest="target_class",
                   help="If greater or equal to 0, model trained only for the specified class.")
 
+    argParser.add_option("-D", "--dataset", default='MNIST',
+                  action="store", type="string", dest="dataset",
+                  help="Either 'MNIST', or 'CIFAR10'.")
+
     (options, args) = argParser.parse_args()
 
     assert (options.unbalance <= 1.0 and options.unbalance > 0.0), "Data unbalance factor must be > 0 and <= 1"
@@ -68,11 +71,12 @@ if __name__ == '__main__':
     gan_epochs = options.epochs
     adam_lr = options.adam_lr
     opt_class = options.target_class
-    batch_size = 32
-    dataset_name = 'MNIST'
+    batch_size = 128
+    dataset_name = options.dataset
 
     # Set channels for mnist.
-    channels=1
+    channels = 1 if dataset_name == 'MNIST' else 3
+    print('Using dataset: ', dataset_name)
 
     # Result directory
     res_dir = "./res_{}_dmode_{}_gmode_{}_unbalance_{}_epochs_{}_lr_{:f}_seed_{}".format(
@@ -84,9 +88,9 @@ if __name__ == '__main__':
     # Read initial data.
     print("read input data...")
     bg_train_full = BatchGenerator(BatchGenerator.TRAIN, batch_size,
-                                   class_to_prune=None, unbalance=None)
+                                   class_to_prune=None, unbalance=None, dataset=dataset_name)
     bg_test = BatchGenerator(BatchGenerator.TEST, batch_size,
-                             class_to_prune=None, unbalance=None)
+                             class_to_prune=None, unbalance=None, dataset=dataset_name)
 
     print("input data loaded...")
 
@@ -129,7 +133,7 @@ if __name__ == '__main__':
 
         # Unbalance the training set.
         bg_train_partial = BatchGenerator(BatchGenerator.TRAIN, batch_size,
-                                          class_to_prune=c, unbalance=unbalance)
+                                          class_to_prune=c, unbalance=unbalance, dataset=dataset_name)
 
         # Train the model (or reload it if already available
         if not (
