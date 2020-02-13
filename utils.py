@@ -25,7 +25,7 @@ def save_image_array(img_array, fname):
             (resolution * (c % 10)): (resolution * ((c % 10) + 1))
             ] = img_array[r, c]
 
-    img = ((img + 0.5) * 255).astype(np.uint8)
+    img = (img * 127.5 + 127.5).astype(np.uint8)
     if (img.shape[0] == 1):
         img = img[0]
     else:
