@@ -44,11 +44,12 @@ class BatchGenerator:
             ((x, y), (x_test, y_test)) = tf.keras.datasets.cifar10.load_data()
 
             if self.data_src == self.TEST:
-                self.dataset_x = x
-                self.dataset_y = y
-            else:
                 self.dataset_x = x_test
                 self.dataset_y = y_test
+            else:
+                self.dataset_x = x
+                self.dataset_y = y
+
 
             # Arrange x: channel first
             self.dataset_x = np.transpose(self.dataset_x, axes=(0, 3, 1, 2))
